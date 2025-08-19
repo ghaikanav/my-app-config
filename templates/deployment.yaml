@@ -33,6 +33,11 @@ spec:
                 secretKeyRef:
                   name: my-app-secret
                   key: connection-string
+            - name: SLACK_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: my-app-k8s-secret
+                  key: slack-api-key
           imagePullPolicy: IfNotPresent
           resources:
             requests:
