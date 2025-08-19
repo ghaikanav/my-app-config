@@ -36,7 +36,7 @@ spec:
             - name: SLACK_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: my-app-k8s-secret
+                  name: my-app-k8s-secret # Name of the k8s secret from ExternalSecret.yaml
                   key: slack-api-key
           imagePullPolicy: IfNotPresent
           resources:

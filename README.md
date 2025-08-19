@@ -74,3 +74,24 @@ kubectl logs -l app=my-app
 ```bash
 helm uninstall my-app
 ```
+
+## 🔐 AWS SecretsManager Authentication
+
+To authenticate with AWS SecretsManager, you'll need to set up IAM credentials in your Kubernetes cluster.
+
+### 🚀 Quick Setup
+
+1. **Create IAM User** in AWS Console with programmatic access
+2. **Grant Permissions** - Ensure the IAM role has `SecretsManagerReadWrite` permission
+3. **Create Kubernetes Secret** with your AWS credentials:
+
+```bash
+kubectl create secret generic aws-creds \
+  --from-literal=aws_access_key_id=<YOUR_AWS_ACCESS_KEY_ID> \
+  --from-literal=aws_secret_access_key=<YOUR_AWS_SECRET_ACCESS_KEY> \
+  -n <namespace>
+```
+
+### ✨ What This Does
+
+This secret enables your `SecretStore.yaml` to securely access AWS SecretsManager and retrieve your application secrets! 🎉
