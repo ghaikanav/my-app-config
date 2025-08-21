@@ -4,7 +4,7 @@
 # Application configuration
 app:
   port: "8080"
-  user: "Mike Tyson"
+  user: "John Cena"
 # Database connection string (sensitive)
 database:
   connectionString: "postgresql://username:password@localhost:5432/database_name"
