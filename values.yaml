@@ -11,4 +11,4 @@ database:
 # Image details (configurable)
 image:
   repository: "kanavghai/my-app"
-  tag: "47e6984"
+  tag: "2814a32"
