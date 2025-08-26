@@ -7,6 +7,7 @@ A Helm chart for deploying a Go HTTP server application to Kubernetes.
 This repository follows **GitOps principles** and serves as a **configuration repository** for the [main application repository](http://github.com/ghaikanav/my-app-devops). The application code lives in a separate repository, while this repository contains all the Kubernetes deployment configurations and Helm charts.
 
 **GitOps Benefits:**
+
 - **Declarative**: All infrastructure is defined as code
 - **Version Controlled**: Configuration changes are tracked in Git
 - **Automated**: Deployment happens automatically when configuration changes
@@ -16,6 +17,7 @@ This repository follows **GitOps principles** and serves as a **configuration re
 ## Overview
 
 This chart deploys a simple Go HTTP server with:
+
 - Configurable application settings via ConfigMap
 - Database connection string stored as a Secret
 - Service exposure via NodePort
@@ -41,13 +43,13 @@ helm install my-app ./ -f custom-values.yaml
 
 Key configuration options in `values.yaml`:
 
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `app.port` | Application port | `8080` |
-| `app.user` | Application user | `Kanav Ghai` |
+| Parameter                   | Description                | Default                                                       |
+| --------------------------- | -------------------------- | ------------------------------------------------------------- |
+| `app.port`                  | Application port           | `8080`                                                        |
+| `app.user`                  | Application user           | `Kanav Ghai`                                                  |
 | `database.connectionString` | Database connection string | `postgresql://username:password@localhost:5432/database_name` |
-| `image.repository` | Docker image repository | `kanavghai/my-app` |
-| `image.tag` | Docker image tag | `latest` |
+| `image.repository`          | Docker image repository    | `kanavghai/my-app`                                            |
+| `image.tag`                 | Docker image tag           | `latest`                                                      |
 
 ## Components
 
@@ -81,28 +83,110 @@ To authenticate with AWS SecretsManager, you'll need to set up IAM credentials i
 
 ### 🚀 Quick Setup
 
-1. Use a service account (reference `serviceaccount.yaml`), annotate it with IAM
-2. Go to IAM role, configure the trust policy OIDC:
+1. Use a service account (reference `serviceaccount.yaml`), annotate it with IAM **_(deprecated)_**
+2. Go to IAM role, configure the trust policy OIDC: **_(deprecated)_**
 
 ```json
 {
-    "Effect": "Allow",
-    "Principal": {
-        "Federated": "arn:aws:iam::<ACCOUNT_ID>:oidc-provider/oidc.eks.<REGION>.amazonaws.com/id/<OIDC_ID>"
-    },
-    "Action": "sts:AssumeRoleWithWebIdentity",
-    "Condition": {
-        "StringEquals": {
-            "oidc.eks.<REGION>.amazonaws.com/id/<OIDC_ID>:sub": "system:serviceaccount:<NAMESPACE>:<SERVICEACCOUNT>"
-        }
+  "Effect": "Allow",
+  "Principal": {
+    "Federated": "arn:aws:iam::<ACCOUNT_ID>:oidc-provider/oidc.eks.<REGION>.amazonaws.com/id/<OIDC_ID>"
+  },
+  "Action": "sts:AssumeRoleWithWebIdentity",
+  "Condition": {
+    "StringEquals": {
+      "oidc.eks.<REGION>.amazonaws.com/id/<OIDC_ID>:sub": "system:serviceaccount:<NAMESPACE>:<SERVICEACCOUNT>"
     }
+  }
 }
-
 ```
 
-3. (Optional, if needed) Install ESO using Helm, then patch it to use your service account to prevent permission errors:
+## 🔐 Alternative Authentication: Using IAM Roles
+
+**Note:** Service account references have issues. Use IAM roles for authentication instead.
+
+**References:**
+
+- [Tutorial](https://containscloud.com/2024/03/24/integrating-aws-secrets-manager-to-eks-using-external-secrets/)
+- [GitHub Issue](https://github.com/external-secrets/external-secrets/issues/2951#issuecomment-1866943943)
+
+### Step 1: Create Two IAM Roles
+
+Create two roles with minimal trust and permissions:
+
+1. **ESO Role** (`eso-role`) - to be assigned as annotation to your external-secrets operator
+2. **Secret Store Role** (`secretstore-<namespace>-role`) - for accessing secrets
+
+#### ESO Role Trust Policy
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["sts:AssumeRole", "sts:TagSession"],
+      "Principal": {
+        "Service": ["ec2.amazonaws.com"]
+      }
+    }
+  ]
+}
+```
+
+#### Secret Store Role Permission Policy and OIDC Trust
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "sts:AssumeRole",
+      "Resource": "arn:aws:iam::<ACCOUNT_ID>:role/secretstore-<NAMESPACE>-eso-role"
+    },
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:aws:iam::<ACCOUNT_ID>:oidc-provider/oidc.eks.<REGION>.amazonaws.com/id/<OIDC_ID>"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "oidc.eks.<REGION>.amazonaws.com/id/<OIDC_ID>:sub": "system:serviceaccount:external-secrets:external-secrets"
+        }
+      }
+    }
+  ]
+}
+```
+
+### Step 2: Annotate Service Account
 
 ```bash
-kubectl patch deployment external-secrets -n external-secrets \
-  -p '{"spec":{"template":{"spec":{"serviceAccountName":"<SERVICE_ACCOUNT_NAME>"}}}}'
+kubectl annotate serviceaccount external-secrets \
+  -n external-secrets \
+  eks.amazonaws.com/role-arn=arn:aws:iam::<ACCOUNT_ID>:role/eso-role \
+  --overwrite
 ```
+
+### Step 3: Verify Configuration
+
+```bash
+kubectl get serviceaccount external-secrets -n external-secrets \
+  -o jsonpath="{.metadata.annotations.eks\.amazonaws\.com/role-arn}"
+```
+
+### Step 4: Create role for your Secret Store
+
+Create another role allow the ESO role to assume it:
+
+**Note:** Give this role permission to read/write secrets as needed.
+
+### Step 5: Final Restart
+
+```bash
+kubectl rollout restart deployment external-secrets -n external-secrets
+```
+
+**Wait a few minutes for changes to take effect.**
