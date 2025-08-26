@@ -81,17 +81,28 @@ To authenticate with AWS SecretsManager, you'll need to set up IAM credentials i
 
 ### 🚀 Quick Setup
 
-1. **Create IAM User** in AWS Console with programmatic access
-2. **Grant Permissions** - Ensure the IAM role has `SecretsManagerReadWrite` permission
-3. **Create Kubernetes Secret** with your AWS credentials:
+1. Use a service account (reference `serviceaccount.yaml`), annotate it with IAM
+2. Go to IAM role, configure the trust policy OIDC:
 
-```bash
-kubectl create secret generic aws-creds \
-  --from-literal=aws_access_key_id=<YOUR_AWS_ACCESS_KEY_ID> \
-  --from-literal=aws_secret_access_key=<YOUR_AWS_SECRET_ACCESS_KEY> \
-  -n <namespace>
+```json
+{
+    "Effect": "Allow",
+    "Principal": {
+        "Federated": "arn:aws:iam::<ACCOUNT_ID>:oidc-provider/oidc.eks.<REGION>.amazonaws.com/id/<OIDC_ID>"
+    },
+    "Action": "sts:AssumeRoleWithWebIdentity",
+    "Condition": {
+        "StringEquals": {
+            "oidc.eks.<REGION>.amazonaws.com/id/<OIDC_ID>:sub": "system:serviceaccount:<NAMESPACE>:<SERVICEACCOUNT>"
+        }
+    }
+}
+
 ```
 
-### ✨ What This Does
+3. (Optional, if needed) Install ESO using Helm, then patch it to use your service account to prevent permission errors:
 
-This secret enables your `SecretStore.yaml` to securely access AWS SecretsManager and retrieve your application secrets! 🎉
+```bash
+kubectl patch deployment external-secrets -n external-secrets \
+  -p '{"spec":{"template":{"spec":{"serviceAccountName":"<SERVICE_ACCOUNT_NAME>"}}}}'
+```
