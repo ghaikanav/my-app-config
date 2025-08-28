@@ -38,8 +38,13 @@ spec:
             - name: SLACK_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: my-app-k8s-secret # Name of the k8s secret from ExternalSecret.yaml
+                  name: slack-secret # Name of the k8s secret from ExternalSecret.yaml
                   key: slack-api-key
+            - name: GREENHOUSE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: greenhouse-secret # Name of the k8s secret from ExternalSecret.yaml
+                  key: greenhouse-api-key
           imagePullPolicy: IfNotPresent
           resources:
             requests:
