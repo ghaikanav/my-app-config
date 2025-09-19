@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: my-app-deployment
+  namespace: ex-test
   annotations:
     reloader.stakater.com/auto: "true"
 spec:
