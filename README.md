@@ -153,27 +153,44 @@ Create two roles with minimal trust and permissions:
       "Action": "sts:AssumeRoleWithWebIdentity",
       "Condition": {
         "StringEquals": {
-          "oidc.eks.<REGION>.amazonaws.com/id/<OIDC_ID>:sub": "system:serviceaccount:external-secrets:external-secrets"
+          "oidc.eks.<REGION>.amazonaws.com/id/<OIDC_ID>:sub": "system:serviceaccount:<namespace>:<service_account_name>"
         }
       }
     }
   ]
 }
 ```
+### Step 1.5: Create Service Account  
+```bash 
+kubectl create serviceaccount <service_account_name> -n <namespace>
+```  
 
 ### Step 2: Annotate Service Account
 
+```bash        
+kubectl annotate serviceaccount <service_account_name> \                           
+ eks.amazonaws.com/role-arn=arn:aws:iam::<Account_id>:role/<eso-role> \
+  --namespace <namespace>
+```
+
 ```bash
-kubectl annotate serviceaccount external-secrets \
-  -n external-secrets \
+kubectl annotate serviceaccount <service_account_name> \                         
+  eks.amazonaws.com/audience=sts.amazonaws.com \
+  --namespace <namespace>
+
+
+kubectl annotate serviceaccount <service_account_name> \
+  -n <namespace> \
   eks.amazonaws.com/role-arn=arn:aws:iam::<ACCOUNT_ID>:role/eso-role \
   --overwrite
 ```
 
+In values.yal , make sure the secrice account is create: false and name: eso
+
 ### Step 3: Verify Configuration
 
 ```bash
-kubectl get serviceaccount external-secrets -n external-secrets \
+kubectl get serviceaccount <service_account_name> -n <namespace> \
   -o jsonpath="{.metadata.annotations.eks\.amazonaws\.com/role-arn}"
 ```
 
@@ -190,3 +207,27 @@ kubectl rollout restart deployment external-secrets -n external-secrets
 ```
 
 **Wait a few minutes for changes to take effect.**
+
+### Install ArgoCD in custom namespace
+Open a file kustomization.yaml 
+```yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: <namespace>
+resources:
+  - install.yaml
+patches:
+  - target:
+      kind: ClusterRoleBinding
+    patch: |-
+      - op: replace
+        path: /subjects/0/namespace
+        value:  <namespace>
+```
+
+```bash
+kubectl apply -k .       
+```
+
+### OIDC Indentity Provider
+Make sure to create a OIDC Indentity Provider in IAM section with URL being the OIDC url from EKS cluster.
